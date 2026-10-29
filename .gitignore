@@ -7,3 +7,4 @@ storage/
 *.tsbuildinfo
 .work/
 .ref-ui/
+*.log
