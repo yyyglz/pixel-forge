@@ -195,29 +195,59 @@
   line-height: 1.45;
 }
 
+.previewBtn {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: inherit;
+  background: var(--raised);
+  cursor: zoom-in;
+}
+
+.previewBtn:hover .preview {
+  filter: brightness(0.92);
+}
+
 .preview {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transition: filter 0.15s ease;
 }
 
+.previewPill,
 .replacePill {
   position: absolute;
-  left: 50%;
+  z-index: 2;
   bottom: 10px;
-  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 5px 11px;
+  border: 0;
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.62);
+  cursor: pointer;
   -webkit-backdrop-filter: blur(6px);
   backdrop-filter: blur(6px);
   color: var(--text);
   font-size: 12px;
   line-height: 1.2;
   white-space: nowrap;
-  pointer-events: none;
+  pointer-events: auto;
+}
+.previewPill {
+  left: 10px;
+}
+
+.replacePill {
+  right: 10px;
 }
 
 .removeBtn {
@@ -421,8 +451,24 @@
   justify-content: space-between;
   gap: 12px;
   flex: none;
-  height: 18px;
+  min-height: 18px;
   margin-bottom: 24px;
+}
+
+.historyHeadText {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.historyHint {
+  margin: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .historyTitle {
@@ -505,6 +551,10 @@
 /* --- responsive ---------------------------------------------------------- */
 
 @media (max-width: 1000px) {
+  .historyHint {
+    display: none;
+  }
+
   .studio {
     height: auto;
     min-height: 100vh;

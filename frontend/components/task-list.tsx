@@ -6,6 +6,7 @@ import { Copy, ImageIcon, RefreshCw } from 'lucide-react';
 import { api, active, Task } from '@/lib/api';
 import { localizeError, MessageKey, templateCopy } from '@/lib/i18n';
 import { useUser } from './providers';
+import { ImagePreview } from './image-preview';
 import styles from './task-list.module.css';
 
 /** Localised label for a task status / pipeline stage identifier. */
@@ -64,6 +65,7 @@ export function TaskCard({
 }) {
   const { user, t, locale } = useUser();
   const [copied, setCopied] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Every card owns its own poll so one task can never influence another one.
@@ -138,15 +140,14 @@ export function TaskCard({
       data-status={task.status}
     >
       {resultUrl ? (
-        <a
+        <button
+          type="button"
           className={styles.resultLink}
-          href={resultUrl}
-          target="_blank"
-          rel="noreferrer"
+          onClick={() => setPreviewOpen(true)}
           aria-label={t('openResult')}
         >
           <img className={styles.resultImage} src={resultUrl} alt={t('imageResult')} />
-        </a>
+        </button>
       ) : (
         <div className={styles.center}>
           <strong className={styles.status}>
@@ -218,11 +219,26 @@ export function TaskCard({
           </button>
         </div>
       )}
+
+      {previewOpen && resultUrl && (
+        <ImagePreview
+          src={resultUrl}
+          alt={t('imageResult')}
+          closeLabel={t('close')}
+          onClose={() => setPreviewOpen(false)}
+        />
+      )}
     </article>
   );
 }
 
-export function TaskList({ variant = 'full' }: { variant?: 'panel' | 'full' }) {
+export function TaskList({
+  variant = 'full',
+  templateId,
+}: {
+  variant?: 'panel' | 'full';
+  templateId?: number;
+}) {
   const { user, t, isSignedIn, openLogin } = useUser();
   const [page, setPage] = useState(0);
   const panel = variant === 'panel';
@@ -230,8 +246,13 @@ export function TaskList({ variant = 'full' }: { variant?: 'panel' | 'full' }) {
   const rootClass = panel ? styles.panelRoot : styles.listRoot;
 
   const query = useQuery({
-    queryKey: ['tasks', user, currentPage],
-    queryFn: ({ signal }) => api<Task[]>(`/tasks?page=${currentPage}`, { signal }, user),
+    queryKey: ['tasks', user, currentPage, templateId ?? 'all'],
+    queryFn: ({ signal }) =>
+      api<Task[]>(
+        `/tasks?page=${currentPage}${templateId ? `&templateId=${templateId}` : ''}`,
+        { signal },
+        user,
+      ),
     enabled: isSignedIn,
   });
 

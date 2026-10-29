@@ -1,6 +1,7 @@
 'use client';
 
 import { use, useEffect, useRef, useState } from 'react';
+import type { ChangeEvent } from 'react';
 import Link from 'next/link';
 import { useIsFetching, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -18,6 +19,7 @@ import { api, Asset, Template } from '@/lib/api';
 import { localizeError, templateCopy, templateCover } from '@/lib/i18n';
 import { useUser } from '@/components/providers';
 import { TaskList } from '@/components/task-list';
+import { ImagePreview } from '@/components/image-preview';
 import styles from './detail.module.css';
 
 type Slot = { status: 'uploading' | 'ready' | 'error'; asset?: Asset; message?: string };
@@ -41,6 +43,7 @@ export default function TemplateDetail({ params }: { params: Promise<{ id: strin
   const [delay, setDelay] = useState(2000);
   const [demoOpen, setDemoOpen] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
+  const [imagePreview, setImagePreview] = useState<{ src: string; alt: string } | null>(null);
   const requests = useRef<Map<number, AbortController>>(new Map());
 
   // Abort any in-flight upload when the page unmounts; replacements abort the
@@ -122,6 +125,30 @@ export default function TemplateDetail({ params }: { params: Promise<{ id: strin
       delete next[index];
       return next;
     });
+  }
+
+  function onPickFile(index: number, event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    const accepted = (template?.acceptedMimeTypes || 'image/jpeg,image/png')
+      .split(',')
+      .map((type) => type.trim());
+    if (file.type && !accepted.includes(file.type)) {
+      setSlots((current) => ({
+        ...current,
+        [index]: { status: 'error', message: t('fileTypeError') },
+      }));
+      return;
+    }
+    if (template && file.size > template.maxFileSizeBytes) {
+      setSlots((current) => ({
+        ...current,
+        [index]: { status: 'error', message: t('fileSizeError') },
+      }));
+      return;
+    }
+    void upload(index, file);
   }
 
   const tasksFetching = useIsFetching({ queryKey: ['tasks', user] }) > 0;
@@ -211,70 +238,80 @@ export default function TemplateDetail({ params }: { params: Promise<{ id: strin
               const asset = slot?.status === 'ready' ? slot.asset : undefined;
               return (
                 <div className={styles.slot} key={index}>
-                  <label className={asset ? `${styles.slotBody} ${styles.slotBodyReady}` : styles.slotBody}>
-                    <input
-                      type="file"
-                      className="sr-only"
-                      accept={template.acceptedMimeTypes || 'image/jpeg,image/png'}
-                      disabled={uploading}
-                      aria-label={`${asset ? t('replace') : t('upload')} ${index + 1}`}
-                      onChange={(event) => {
-                        const file = event.target.files?.[0];
-                        event.target.value = '';
-                        if (!file) return;
-                        const accepted = (template.acceptedMimeTypes || 'image/jpeg,image/png')
-                          .split(',')
-                          .map((type) => type.trim());
-                        if (file.type && !accepted.includes(file.type)) {
-                          setSlots((current) => ({
-                            ...current,
-                            [index]: { status: 'error', message: t('fileTypeError') },
-                          }));
-                          return;
+                  {asset ? (
+                    <>
+                      <button
+                        type="button"
+                        className={styles.previewBtn}
+                        onClick={() =>
+                          setImagePreview({ src: asset.previewUrl, alt: `${t('image')} ${index + 1}` })
                         }
-                        if (file.size > template.maxFileSizeBytes) {
-                          setSlots((current) => ({
-                            ...current,
-                            [index]: { status: 'error', message: t('fileSizeError') },
-                          }));
-                          return;
+                        aria-label={`${t('preview')} ${index + 1}`}
+                      >
+                        <img
+                          className={styles.preview}
+                          src={asset.previewUrl}
+                          alt={`${t('image')} ${index + 1}`}
+                        />
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.previewPill}
+                        onClick={() =>
+                          setImagePreview({ src: asset.previewUrl, alt: `${t('image')} ${index + 1}` })
                         }
-                        void upload(index, file);
-                      }}
-                    />
-                    {asset ? (
-                      <>
-                        <img className={styles.preview} src={asset.previewUrl} alt={`${t('image')} ${index + 1}`} />
-                        <span className={styles.replacePill}>{t('replace')}</span>
-                      </>
-                    ) : uploading ? (
-                      <span className={styles.slotStatus}>
-                        <LoaderCircle className="spin" size={20} aria-hidden="true" />
-                        <span>{t('uploading')}</span>
-                      </span>
-                    ) : slot?.status === 'error' ? (
-                      <span className={styles.slotStatus}>
-                        <span className={styles.errorText}>{slot.message || t('uploadFailed')}</span>
-                        <span className={styles.reuploadText}>{t('reupload')}</span>
-                      </span>
-                    ) : (
-                      <>
-                        <span className={styles.iconCircle}>
-                          <ImagePlus size={18} aria-hidden="true" />
+                        aria-label={`${t('preview')} ${index + 1}`}
+                      >
+                        {t('preview')}
+                      </button>
+                      <label className={styles.replacePill}>
+                        <input
+                          type="file"
+                          className="sr-only"
+                          accept={template.acceptedMimeTypes || 'image/jpeg,image/png'}
+                          aria-label={`${t('replace')} ${index + 1}`}
+                          onChange={(event) => onPickFile(index, event)}
+                        />
+                        {t('replace')}
+                      </label>
+                      <button
+                        type="button"
+                        className={styles.removeBtn}
+                        aria-label={`${t('remove')} ${index + 1}`}
+                        onClick={() => remove(index)}
+                      >
+                        <X size={14} aria-hidden="true" />
+                      </button>
+                    </>
+                  ) : (
+                    <label className={styles.slotBody}>
+                      <input
+                        type="file"
+                        className="sr-only"
+                        accept={template.acceptedMimeTypes || 'image/jpeg,image/png'}
+                        disabled={uploading}
+                        aria-label={`${t('upload')} ${index + 1}`}
+                        onChange={(event) => onPickFile(index, event)}
+                      />
+                      {uploading ? (
+                        <span className={styles.slotStatus}>
+                          <LoaderCircle className="spin" size={20} aria-hidden="true" />
+                          <span>{t('uploading')}</span>
                         </span>
-                        <span className={styles.chooseText}>{t('choose')}</span>
-                      </>
-                    )}
-                  </label>
-                  {asset && (
-                    <button
-                      type="button"
-                      className={styles.removeBtn}
-                      aria-label={`${t('remove')} ${index + 1}`}
-                      onClick={() => remove(index)}
-                    >
-                      <X size={14} aria-hidden="true" />
-                    </button>
+                      ) : slot?.status === 'error' ? (
+                        <span className={styles.slotStatus}>
+                          <span className={styles.errorText}>{slot.message || t('uploadFailed')}</span>
+                          <span className={styles.reuploadText}>{t('reupload')}</span>
+                        </span>
+                      ) : (
+                        <>
+                          <span className={styles.iconCircle}>
+                            <ImagePlus size={18} aria-hidden="true" />
+                          </span>
+                          <span className={styles.chooseText}>{t('choose')}</span>
+                        </>
+                      )}
+                    </label>
                   )}
                 </div>
               );
@@ -360,7 +397,10 @@ export default function TemplateDetail({ params }: { params: Promise<{ id: strin
 
       <aside className={`${styles.panel} ${styles.panelRight}`}>
         <header className={styles.historyHead}>
-          <h2 className={styles.historyTitle}>{t('history')}</h2>
+          <div className={styles.historyHeadText}>
+            <h2 className={styles.historyTitle}>{t('history')}</h2>
+            <p className={styles.historyHint}>{t('templateHistoryHint')}</p>
+          </div>
           <button
             type="button"
             className={styles.refreshBtn}
@@ -371,8 +411,17 @@ export default function TemplateDetail({ params }: { params: Promise<{ id: strin
             <RefreshCw size={18} aria-hidden="true" className={tasksFetching ? 'spin' : undefined} />
           </button>
         </header>
-        <TaskList variant="panel" />
+        <TaskList variant="panel" templateId={id} />
       </aside>
+
+      {imagePreview && (
+        <ImagePreview
+          src={imagePreview.src}
+          alt={imagePreview.alt}
+          closeLabel={t('close')}
+          onClose={() => setImagePreview(null)}
+        />
+      )}
     </div>
   );
 }

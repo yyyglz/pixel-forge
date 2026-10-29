@@ -20,7 +20,9 @@ const { labels } = vi.hoisted(() => ({
     refresh: '刷新',
     copy: '复制链接',
     copied: '已复制',
-    openResult: '查看制作结果',
+    openResult: '预览制作结果',
+    close: '关闭',
+    preview: '预览',
     imageResult: '制作结果',
     refreshButton: '刷新',
     noTasks: '还没有作品',
@@ -129,21 +131,25 @@ describe('TaskCard 异步状态', () => {
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
 
-    expect(screen.getByRole('link', { name: '查看制作结果' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '预览制作结果' })).toBeInTheDocument();
     expect(screen.queryByText('处理中')).not.toBeInTheDocument();
   });
 
-  it('成功任务展示可点开新窗口的结果图', () => {
+  it('成功任务在当前页弹窗预览结果，不打开新窗口', () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('网络错误')));
     renderWithClient(
       <TaskCard initial={task('b', 'SUCCEEDED', { resultUrl: '/api/media/results/b.png?userId=1' })} />,
     );
 
-    const link = screen.getByRole('link', { name: '查看制作结果' });
-    expect(link).toHaveAttribute('href', '/api/media/results/b.png?userId=1');
-    expect(link).toHaveAttribute('target', '_blank');
-    expect(link).toHaveAttribute('rel', 'noreferrer');
-    expect(screen.getByRole('img', { name: '制作结果' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '预览制作结果' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '预览制作结果' }));
+
+    const dialog = screen.getByRole('dialog', { name: '制作结果' });
+    expect(dialog).toBeInTheDocument();
+    expect(dialog.querySelector('img')).toHaveAttribute('src', '/api/media/results/b.png?userId=1');
+
+    fireEvent.click(screen.getByRole('button', { name: '关闭' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it('复制按钮写入剪贴板并提示已复制', async () => {
@@ -197,6 +203,23 @@ describe('TaskList', () => {
 
     expect(await screen.findByText('还没有作品')).toBeInTheDocument();
     expect(screen.getByText('上传素材，开始第一次创作。')).toBeInTheDocument();
+  });
+
+  it('panel 变体按 templateId 过滤当前模板的创作记录', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/tasks?')) return jsonResponse([]);
+      return jsonResponse([]);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderWithClient(<TaskList variant="panel" templateId={7} />);
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    expect(
+      fetchMock.mock.calls.some(([input]) => String(input).includes('templateId=7')),
+    ).toBe(true);
+    expect(await screen.findByText('还没有作品')).toBeInTheDocument();
   });
 
   it('full 变体渲染任务卡片并保留分页控件', async () => {
