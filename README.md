@@ -86,9 +86,10 @@ docker-compose.yml           MySQL、Java 后端、Next.js 前端
 
 - 对参考图做像素采样，提取色板与几何：页面 `#0a0a0c`、面板 `#111115`、浮层 `#1c1c22`、边框 `#1e1e22`、橄榄绿按钮 `#3e4c15`、头像绿 `#6b8800`、logo 黄绿 `#cfff01`；55px 顶栏、30px chips、6 列 9:16 卡片（gap 8、左右 14～16px）、详情页 7～8px 外间距 + 两栏面板（左栏约 426px / 右栏自适应，gap 7～8px）、历史卡片约 257×501、账户弹窗 560px 宽。
 - 列表页：subnav chips（模板 / 历史记录 / 账户设置）、分类文字 tabs、6 列竖版封面卡片；顶栏由站点壳层渲染。
-- 详情页：隐藏站点顶栏，整页两栏 studio 布局；左栏“返回 + 标题 + 齿轮演示控制 + 示例封面 + Upload 标题（含所需数量与 JPEG/PNG/10MB 要求）+ 虚线上传位 + 底部橄榄绿 Create Now + 100”；右栏 History（标题旁标注“仅显示使用该模板的创作任务”）+ 刷新。上传槽填充后提供三个明确操作：点击缩略图或“预览”按钮→站内弹窗预览；“替换图片”→重新选择文件；右上 ×→移除。
+- 详情页：**保留与首页一致的站点 header**（logo、语言、额度、退出登录），下方为整页两栏 studio 布局（高度扣掉 55px 顶栏；参考图详情页本身无顶栏，本次按需求与首页统一，其余两栏几何不变）；左栏“返回 + 标题 + 齿轮演示控制 + 示例封面 + Upload 标题（含所需数量与 JPEG/PNG/10MB 要求）+ 虚线上传位 + 底部橄榄绿 Create Now + 100”；右栏 History + 刷新。上传槽填充后提供三个明确操作：点击缩略图或“预览”按钮→站内弹窗预览；“替换图片”→重新选择文件；右上 ×→移除。
 - 任务卡片：深色卡、居中状态/阶段/失败原因、成功显示结果图、查询异常黄条；点击成功结果图在**站内弹窗**预览（不跳新标签页）。左下操作与参考图一致：**刷新**（仅等待/处理中的卡片出现，用于立即同步该任务）与**删除**（所有卡片都有，二次确认调用 DELETE 清理记录；处理中删除等同取消，后台在下一阶段边界停止）。详情右栏显示当前模板最新 3 条任务，`/history` 页显示全部并补模板标题/创建时间/状态与分页。
 - 账户设置：标题 + 圆形关闭按钮、头像/昵称/邮箱/密码卡片、四行带图标的入口（账户与额度、切换演示用户、服务条款、隐私政策）、底部退出登录说明；登录/计费/条款弹窗使用同一套弹窗样式。
+- 参考图首页顶部的 `Video` / `workflow` / `Test Channel Classification` 是原产品的内容频道/测试频道入口，不属于题目功能要求；本项目按“文案可替换”将其映射为「模板 / 历史记录 / 账户设置」三个可用入口，并保持相同的 chip 版式。
 - 为满足 R-06，演示控制收进详情页齿轮按钮弹出面板（默认折叠），不占用正式页面主体。
 
 ### 交付截图（由 `docker compose` 生产构建实拍）
@@ -97,7 +98,7 @@ docker-compose.yml           MySQL、Java 后端、Next.js 前端
 | --- | --- |
 | 模板列表（中文，默认） | [01-template-list.jpg](docs/screenshots/01-template-list.jpg) |
 | 模板列表（英文） | [02-template-list-en.jpg](docs/screenshots/02-template-list-en.jpg) |
-| 模板详情 + 该模板的制作中/失败/成功记录 | [03-template-detail-history.jpg](docs/screenshots/03-template-detail-history.jpg) |
+| 模板详情（保留站点顶栏）+ 该模板的制作中/失败/成功记录 | [03-template-detail-history.jpg](docs/screenshots/03-template-detail-history.jpg) |
 | 上传后：预览 / 替换图片 / 移除 三个操作 | [07-detail-upload-actions.jpg](docs/screenshots/07-detail-upload-actions.jpg) |
 | 站内弹窗预览（不打开新页面） | [08-in-app-preview.jpg](docs/screenshots/08-in-app-preview.jpg) |
 | 删除记录二次确认（左下删除操作） | [09-delete-record-confirm.jpg](docs/screenshots/09-delete-record-confirm.jpg) |

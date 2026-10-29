@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
 import { QueryClient, QueryClientProvider, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createContext, useContext, useEffect, useState } from 'react';
 import {
@@ -65,7 +64,6 @@ export default function Providers({ children }: { children: React.ReactNode }) {
 }
 
 function Shell({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
   const client = useQueryClient();
   const [user, setUser] = useState(1);
   const [isSignedIn, setSignedIn] = useState(false);
@@ -74,7 +72,6 @@ function Shell({ children }: { children: React.ReactNode }) {
   const [modal, setModal] = useState<ModalName>(null);
   const [showResetNote, setShowResetNote] = useState(false);
 
-  const isStudio = /^\/templates\/[^/]+/.test(pathname ?? '');
 
   useEffect(() => {
     let mounted = true;
@@ -200,50 +197,48 @@ function Shell({ children }: { children: React.ReactNode }) {
         t,
       }}
     >
-      {!isStudio && (
-        <header className="topbar">
-          <Link href="/" className="brand" aria-label="PixelForge">
-            <LogoMark />
-          </Link>
-          <div className="top-actions">
-            <button
-              type="button"
-              onClick={() => setLocale(locale === 'zh' ? 'en' : 'zh')}
-              aria-label={t('language')}
-            >
-              <Languages size={15} aria-hidden="true" />
-              {t('language')}
-            </button>
-            {isSignedIn ? (
-              <>
-                <button
-                  type="button"
-                  className="credits-trigger"
-                  data-ui="account"
-                  onClick={() => openModal('account')}
-                >
-                  {account.data ? (
-                    <>
-                      {planLabel} {account.data.credits} {t('creditsUnit')}
-                    </>
-                  ) : account.isError ? (
-                    t('accountError')
-                  ) : (
-                    '…'
-                  )}
-                </button>
-                <button type="button" className="logout" onClick={logOut}>
-                  {t('signOut')}
-                </button>
-              </>
-            ) : (
-              <button type="button" className="login-btn" data-ui="login" onClick={() => openModal('login')}>
-                {t('signIn')}
+      <header className="topbar">
+        <Link href="/" className="brand" aria-label="PixelForge">
+          <LogoMark />
+        </Link>
+        <div className="top-actions">
+          <button
+            type="button"
+            onClick={() => setLocale(locale === 'zh' ? 'en' : 'zh')}
+            aria-label={t('language')}
+          >
+            <Languages size={15} aria-hidden="true" />
+            {t('language')}
+          </button>
+          {isSignedIn ? (
+            <>
+              <button
+                type="button"
+                className="credits-trigger"
+                data-ui="account"
+                onClick={() => openModal('account')}
+              >
+                {account.data ? (
+                  <>
+                    {planLabel} {account.data.credits} {t('creditsUnit')}
+                  </>
+                ) : account.isError ? (
+                  t('accountError')
+                ) : (
+                  '…'
+                )}
               </button>
-            )}
-          </div>
-        </header>
-      )}
+              <button type="button" className="logout" onClick={logOut}>
+                {t('signOut')}
+              </button>
+            </>
+          ) : (
+            <button type="button" className="login-btn" data-ui="login" onClick={() => openModal('login')}>
+              {t('signIn')}
+            </button>
+          )}
+        </div>
+      </header>
       <main key={`${user}-${isSignedIn}`}>{children}</main>
 
       {modal && (

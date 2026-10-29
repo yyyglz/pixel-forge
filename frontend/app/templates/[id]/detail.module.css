@@ -3,7 +3,7 @@
  * right. All colours come from the design tokens declared in globals.css. */
 
 .studio {
-  height: 100vh;
+  height: calc(100vh - 55px);
   padding: 7px 7px 6px;
   display: grid;
   grid-template-columns: minmax(340px, 33.65%) minmax(0, 1fr);
@@ -538,7 +538,7 @@
 
   .studio {
     height: auto;
-    min-height: 100vh;
+    min-height: calc(100vh - 55px);
     grid-template-columns: minmax(0, 1fr);
     overflow: visible;
   }

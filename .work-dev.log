@@ -1,0 +1,25 @@
+
+> pixel-forge-frontend@1.0.0 dev
+> next dev -p 3001
+
+▲ Next.js 16.2.7 (Turbopack)
+- Local:         http://localhost:3001
+- Network:       http://192.168.9.101:3001
+✓ Ready in 357ms
+
+ GET / 200 in 239ms (next.js: 135ms, application-code: 104ms)
+ GET /templates/2 200 in 356ms (next.js: 321ms, application-code: 35ms)
+ GET /templates/2 200 in 72ms (next.js: 4ms, application-code: 69ms)
+ GET /templates/2 200 in 35ms (next.js: 4ms, application-code: 31ms)
+ GET /templates/2 200 in 39ms (next.js: 7ms, application-code: 33ms)
+ GET / 200 in 29ms (next.js: 4ms, application-code: 25ms)
+ GET / 200 in 37ms (next.js: 2ms, application-code: 34ms)
+ GET /templates/2 200 in 99ms (next.js: 30ms, application-code: 69ms)
+ GET /templates/2 200 in 41ms (next.js: 4ms, application-code: 37ms)
+ GET /templates/2 200 in 61ms (next.js: 10ms, application-code: 50ms)
+ GET /templates/2 200 in 40ms (next.js: 6ms, application-code: 34ms)
+ GET /templates/2 200 in 113ms (next.js: 9ms, application-code: 104ms)
+ GET /templates/2 200 in 45ms (next.js: 8ms, application-code: 37ms)
+ GET / 200 in 21ms (next.js: 2ms, application-code: 19ms)
+ GET / 200 in 61ms (next.js: 3ms, application-code: 57ms)
+[?25h
