@@ -1,0 +1,221 @@
+/* Templates catalog — layout measured from the UI-01 reference (1280 × 706). */
+
+/* Secondary navigation chips (templates / history / account) ------------------ */
+.subnav {
+  display: flex;
+  gap: 10px;
+  margin: 20px 16px 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.subnav::-webkit-scrollbar {
+  display: none;
+}
+
+.chip {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  height: 30px;
+  padding: 0 13px;
+  border-radius: var(--radius-chip);
+  background: var(--raised);
+  /* Inactive chips read slightly brighter than the muted filter labels. */
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 13px;
+  line-height: 1;
+  white-space: nowrap;
+  transition: color 0.15s ease;
+}
+
+.chip:hover {
+  color: var(--text-strong);
+}
+
+.chipActive,
+.chipActive:hover {
+  background: var(--raised-2);
+  color: var(--text-strong);
+  font-weight: 600;
+  cursor: default;
+}
+
+/* The horizontal scroll containers clip descendant outlines, so keep the
+   shared accent focus ring but draw it inside the chip. */
+.chip:focus-visible,
+.filter:focus-visible {
+  outline-offset: -2px;
+}
+
+/* Category filter row -------------------------------------------------------- */
+.filters {
+  display: flex;
+  gap: 24px;
+  margin: 22px 16px 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.filters::-webkit-scrollbar {
+  display: none;
+}
+
+.filter {
+  flex: none;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 20px;
+  white-space: nowrap;
+  transition: color 0.15s ease;
+}
+
+.filter:hover {
+  color: var(--text);
+}
+
+.filterActive,
+.filterActive:hover {
+  color: var(--text-strong);
+}
+
+/* Template grid -------------------------------------------------------------- */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+  margin: 16px 14px 40px;
+}
+
+.card {
+  position: relative;
+  display: block;
+  aspect-ratio: 9 / 16;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--raised);
+}
+
+.cover {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.35s ease;
+}
+
+.card:hover .cover {
+  transform: scale(1.03);
+}
+
+.scrim {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.72), rgba(0, 0, 0, 0) 45%);
+}
+
+.cardTitle {
+  position: absolute;
+  right: 16px;
+  bottom: 12px;
+  left: 16px;
+  overflow: hidden;
+  margin: 0;
+  color: var(--text-strong);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  white-space: nowrap;
+}
+
+/* Loading skeleton ----------------------------------------------------------- */
+.loading {
+  display: block;
+}
+
+.skeleton {
+  aspect-ratio: 9 / 16;
+  border-radius: 8px;
+  background: linear-gradient(
+    100deg,
+    var(--raised) 30%,
+    rgba(255, 255, 255, 0.06) 50%,
+    var(--raised) 70%
+  );
+  background-size: 220% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 180% 0;
+  }
+
+  to {
+    background-position: -180% 0;
+  }
+}
+
+/* Error / empty states ------------------------------------------------------- */
+.status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 280px;
+  margin: 16px 16px 40px;
+  padding: 40px 16px;
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+.status p {
+  margin: 0;
+}
+
+.retry {
+  height: 30px;
+  padding: 0 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-control);
+  background: var(--raised);
+  color: var(--text);
+  font-size: 13px;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.retry:hover {
+  border-color: var(--dash);
+  background: var(--raised-2);
+  color: var(--text-strong);
+}
+
+/* Responsive column counts --------------------------------------------------- */
+@media (max-width: 1000px) {
+  .grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 430px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .cardTitle {
+    right: 12px;
+    bottom: 10px;
+    left: 12px;
+  }
+}

@@ -1,0 +1,50 @@
+/* /history — panel-style container that keeps the site header above it. */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-height: calc(100vh - 55px - 32px);
+  margin: 16px;
+  padding: 24px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.title {
+  margin: 0;
+  color: var(--text-strong);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.browse {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  transition: color 0.15s ease;
+}
+
+.browse:hover {
+  color: var(--text-strong);
+}
+
+@media (max-width: 640px) {
+  .page {
+    gap: 16px;
+    margin: 12px;
+    padding: 16px;
+    min-height: calc(100vh - 55px - 24px);
+  }
+}
