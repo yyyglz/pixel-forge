@@ -83,6 +83,23 @@ class TaskService {
     }
     void event(String id,String stage,String type,String msg) { db.update("INSERT INTO task_events(task_id,stage,event_type,message) VALUES (?,?,?,?)",id,stage,type,msg); }
     Map<String,Object> task(long user,String id) { user(user); List<Map<String,Object>> rows=db.queryForList(select()+" WHERE t.id=? AND t.user_id=?",id,user); if(rows.isEmpty()) throw new ApiException(HttpStatus.NOT_FOUND,"任务不存在"); return rows.get(0); }
+    void delete(long user,String id) {
+        user(user);
+        List<Map<String,Object>> rows=db.queryForList("SELECT status,result_url FROM creation_tasks WHERE id=? AND user_id=?",id,user);
+        if(rows.isEmpty()) throw new ApiException(HttpStatus.NOT_FOUND,"任务不存在");
+        String resultUrl=(String)rows.get(0).get("result_url");
+        tx.executeWithoutResult(s -> {
+            db.update("DELETE FROM task_events WHERE task_id=?",id);
+            db.update("DELETE FROM task_assets WHERE task_id=?",id);
+            db.update("DELETE FROM creation_tasks WHERE id=? AND user_id=?",id,user);
+        });
+        // A running task stops at its next stage boundary because begin()/fail()
+        // no longer match a row; remove its result file if one already exists.
+        if(resultUrl!=null && resultUrl.startsWith("/api/media/results/")) {
+            String filename=resultUrl.substring("/api/media/results/".length()).split("\\?")[0];
+            if(filename.matches("[0-9a-f-]{36}\\.(png|jpg)")) { try { Files.deleteIfExists(storage.resolve("results").resolve(filename).normalize()); } catch(IOException ignored) { } }
+        }
+    }
     List<Map<String,Object>> history(long user,Long template,int page) { user(user); if(page<0 || page>10000) throw new ApiException(HttpStatus.BAD_REQUEST,"页码不合法"); return template==null ? db.queryForList(select()+" WHERE t.user_id=? ORDER BY t.created_at DESC,t.id DESC LIMIT 20 OFFSET ?",user,page*20) : db.queryForList(select()+" WHERE t.user_id=? AND t.template_id=? ORDER BY t.created_at DESC,t.id DESC LIMIT 20 OFFSET ?",user,template,page*20); }
     private String select() { return "SELECT t.id,t.template_id AS templateId,p.title AS templateTitle,t.status,t.current_stage AS currentStage,t.failed_stage AS failedStage,t.error_message AS errorMessage,t.result_url AS resultUrl,t.created_at AS createdAt,t.started_at AS startedAt,t.completed_at AS completedAt,t.updated_at AS updatedAt FROM creation_tasks t JOIN templates p ON p.id=t.template_id"; }
     Path storage() { return storage; }

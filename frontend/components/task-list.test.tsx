@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { TaskCard, TaskList } from './task-list';
@@ -18,8 +18,13 @@ const { labels } = vi.hoisted(() => ({
     syncError: '状态同步失败，保留上次状态。',
     queryAgain: '重新查询',
     refresh: '刷新',
-    copy: '复制链接',
-    copied: '已复制',
+    deleteTask: '删除记录',
+    deleteConfirm: '确定删除这条创作记录？',
+    deleteRunningHint: '任务仍在处理中，删除后将停止后续处理，确定删除？',
+    delete: '删除',
+    cancel: '取消',
+    deleteFailed: '删除失败，请重试。',
+    loading: '加载中…',
     openResult: '预览制作结果',
     close: '关闭',
     preview: '预览',
@@ -152,22 +157,43 @@ describe('TaskCard 异步状态', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
-  it('复制按钮写入剪贴板并提示已复制', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('网络错误')));
-    const writeText = vi.fn().mockResolvedValue(undefined);
-    Object.defineProperty(navigator, 'clipboard', {
-      configurable: true,
-      value: { writeText },
+  it('结束任务可以通过删除按钮移除记录', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes('/api/tasks/c') && init?.method === 'DELETE') return jsonResponse({ deleted: true });
+      return jsonResponse(task('c', 'FAILED'));
     });
+    vi.stubGlobal('fetch', fetchMock);
 
     renderWithClient(
       <TaskCard initial={task('c', 'FAILED', { failedStage: 'GENERATING', errorMessage: '任务失败' })} />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '复制链接' }));
+    fireEvent.click(screen.getByRole('button', { name: '删除记录' }));
+    const dialog = screen.getByRole('dialog', { name: '删除记录' });
+    expect(dialog).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: '删除' }));
 
-    await waitFor(() => expect(writeText).toHaveBeenCalledWith('c'));
-    expect(await screen.findByText('已复制')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        fetchMock.mock.calls.some(
+          ([input, init]) => String(input).includes('/api/tasks/c') && init?.method === 'DELETE',
+        ),
+      ).toBe(true),
+    );
+  });
+
+  it('处理中的任务显示刷新按钮，终态只保留删除操作', () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('网络错误')));
+    renderWithClient(
+      <>
+        <TaskCard initial={task('r', 'RUNNING', { currentStage: 'GENERATING' })} />
+        <TaskCard initial={task('s', 'SUCCEEDED', { resultUrl: '/api/media/results/s.jpg?userId=1' })} />
+      </>,
+    );
+
+    expect(screen.getAllByRole('button', { name: '刷新' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: '删除记录' })).toHaveLength(2);
   });
 
   it('full 变体显示模板标题、创建时间与状态文字', () => {

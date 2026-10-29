@@ -55,6 +55,23 @@ class TaskServiceTest {
         assertThrows(ApiException.class,()->service.create(1,new CreateTask(1,List.of("only-one"),"NONE",500)));
         verify(db,never()).update(contains("INSERT INTO creation_tasks"),any(Object[].class));
     }
+    @Test void deleteOwnedTaskRemovesChildrenAndResultFile() throws Exception {
+        Files.createDirectories(dir.resolve("results"));
+        Path result=dir.resolve("results/11111111-1111-1111-1111-111111111111.jpg"); Files.writeString(result,"x");
+        when(db.queryForObject(contains("SELECT COUNT(*)"),eq(Integer.class),any(Object[].class))).thenReturn(1);
+        when(db.queryForList(contains("SELECT status,result_url FROM creation_tasks"),any(Object[].class))).thenReturn(List.of(Map.of("status","SUCCEEDED","result_url","/api/media/results/11111111-1111-1111-1111-111111111111.jpg?userId=1")));
+        service.delete(1,"11111111-1111-1111-1111-111111111111");
+        verify(db).update(contains("DELETE FROM task_events"),eq("11111111-1111-1111-1111-111111111111"));
+        verify(db).update(contains("DELETE FROM task_assets"),eq("11111111-1111-1111-1111-111111111111"));
+        verify(db).update(contains("DELETE FROM creation_tasks"),eq("11111111-1111-1111-1111-111111111111"),eq(1L));
+        assertFalse(Files.exists(result));
+    }
+    @Test void deleteMissingOrOtherUsersTaskIsRejected() {
+        when(db.queryForObject(contains("SELECT COUNT(*)"),eq(Integer.class),any(Object[].class))).thenReturn(1);
+        when(db.queryForList(contains("SELECT status,result_url FROM creation_tasks"),any(Object[].class))).thenReturn(List.of());
+        assertThrows(ApiException.class,()->service.delete(2,"missing-task"));
+        verify(db,never()).update(contains("DELETE FROM"),any(Object[].class));
+    }
     @Test void queryingAnotherUsersTaskIsNotFound() {
         when(db.queryForObject(contains("SELECT COUNT(*)"),eq(Integer.class),any(Object[].class))).thenReturn(1);
         when(db.queryForList(contains("WHERE t.id=? AND t.user_id=?"),any(Object[].class))).thenReturn(List.of());

@@ -151,7 +151,8 @@ export default function TemplateDetail({ params }: { params: Promise<{ id: strin
     void upload(index, file);
   }
 
-  const tasksFetching = useIsFetching({ queryKey: ['tasks', user] }) > 0;
+  const tasksFetching =
+    useIsFetching({ queryKey: ['tasks', user] }) + useIsFetching({ queryKey: ['task', user] }) > 0;
 
   if (templateQuery.isPending) {
     return (
@@ -397,16 +398,17 @@ export default function TemplateDetail({ params }: { params: Promise<{ id: strin
 
       <aside className={`${styles.panel} ${styles.panelRight}`}>
         <header className={styles.historyHead}>
-          <div className={styles.historyHeadText}>
-            <h2 className={styles.historyTitle}>{t('history')}</h2>
-            <p className={styles.historyHint}>{t('templateHistoryHint')}</p>
-          </div>
+          <h2 className={styles.historyTitle}>{t('history')}</h2>
           <button
             type="button"
             className={styles.refreshBtn}
             data-ui="history-refresh"
             aria-label={t('refresh')}
-            onClick={() => void client.refetchQueries({ queryKey: ['tasks', user] })}
+            title={t('refreshHint')}
+            onClick={() => {
+              void client.refetchQueries({ queryKey: ['tasks', user] });
+              void client.refetchQueries({ queryKey: ['task', user] });
+            }}
           >
             <RefreshCw size={18} aria-hidden="true" className={tasksFetching ? 'spin' : undefined} />
           </button>

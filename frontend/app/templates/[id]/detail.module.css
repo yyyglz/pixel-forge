@@ -455,22 +455,6 @@
   margin-bottom: 24px;
 }
 
-.historyHeadText {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  min-width: 0;
-}
-
-.historyHint {
-  margin: 0;
-  overflow: hidden;
-  color: var(--muted);
-  font-size: 11px;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
 .historyTitle {
   margin: 0;
   color: var(--text-strong);
@@ -551,9 +535,6 @@
 /* --- responsive ---------------------------------------------------------- */
 
 @media (max-width: 1000px) {
-  .historyHint {
-    display: none;
-  }
 
   .studio {
     height: auto;

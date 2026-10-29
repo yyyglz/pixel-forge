@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Copy, ImageIcon, RefreshCw } from 'lucide-react';
+import { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { ImageIcon, RefreshCw, Trash2 } from 'lucide-react';
 import { api, active, Task } from '@/lib/api';
 import { localizeError, MessageKey, templateCopy } from '@/lib/i18n';
 import { useUser } from './providers';
@@ -27,35 +27,6 @@ function stageLabel(stage: string | null, t: Translate): string {
   return stageKeys[stage] ? t(stageKeys[stage]) : stage;
 }
 
-/**
- * Copy through the async Clipboard API when it is available and fall back to a
- * temporary textarea + execCommand for older browsers / non-secure contexts.
- */
-async function writeClipboard(value: string): Promise<boolean> {
-  try {
-    if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(value);
-      return true;
-    }
-  } catch {
-    // Permission denied or unsupported clipboard — fall through to the fallback.
-  }
-  try {
-    const textarea = document.createElement('textarea');
-    textarea.value = value;
-    textarea.setAttribute('readonly', '');
-    textarea.style.position = 'fixed';
-    textarea.style.opacity = '0';
-    document.body.appendChild(textarea);
-    textarea.select();
-    const copied = document.execCommand('copy');
-    document.body.removeChild(textarea);
-    return copied;
-  } catch {
-    return false;
-  }
-}
-
 export function TaskCard({
   initial,
   variant = 'panel',
@@ -64,9 +35,11 @@ export function TaskCard({
   variant?: 'panel' | 'full';
 }) {
   const { user, t, locale } = useUser();
-  const [copied, setCopied] = useState(false);
+  const client = useQueryClient();
   const [previewOpen, setPreviewOpen] = useState(false);
-  const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   // Every card owns its own poll so one task can never influence another one.
   // The query key contains the demo user, which isolates users on top of the
@@ -88,13 +61,6 @@ export function TaskCard({
     },
   });
 
-  useEffect(
-    () => () => {
-      if (copiedTimer.current) clearTimeout(copiedTimer.current);
-    },
-    [],
-  );
-
   const task = query.data;
   const running = active(task);
   const statusText = stageLabel(task.status, t);
@@ -114,16 +80,19 @@ export function TaskCard({
     locale,
   ).title;
 
-  function showCopied() {
-    setCopied(true);
-    if (copiedTimer.current) clearTimeout(copiedTimer.current);
-    copiedTimer.current = setTimeout(() => setCopied(false), 1500);
-  }
-
-  async function copyLink() {
-    // A finished task is most useful to share through its result URL.
-    const value = resultUrl ? new URL(resultUrl, window.location.origin).href : task.id;
-    if (await writeClipboard(value)) showCopied();
+  async function removeTask() {
+    setDeleting(true);
+    setDeleteError('');
+    try {
+      await api<{ deleted: boolean }>(`/tasks/${task.id}`, { method: 'DELETE' }, user);
+      client.removeQueries({ queryKey: ['task', user, task.id] });
+      await client.invalidateQueries({ queryKey: ['tasks', user] });
+      setConfirmDelete(false);
+    } catch (error) {
+      setDeleteError(error instanceof Error ? localizeError(error.message, locale) : t('deleteFailed'));
+    } finally {
+      setDeleting(false);
+    }
   }
 
   const statusClass =
@@ -188,6 +157,7 @@ export function TaskCard({
             data-ui="task-refresh"
             onClick={() => void query.refetch()}
             aria-label={t('refresh')}
+            title={t('refresh')}
           >
             <RefreshCw aria-hidden="true" className={query.isRefetching ? styles.spinning : undefined} />
           </button>
@@ -195,17 +165,43 @@ export function TaskCard({
         <button
           type="button"
           className={styles.iconBtn}
-          data-ui="task-copy"
-          onClick={() => void copyLink()}
-          aria-label={t('copy')}
+          data-ui="task-delete"
+          onClick={() => setConfirmDelete(true)}
+          aria-label={t('deleteTask')}
+          title={t('deleteTask')}
         >
-          <Copy aria-hidden="true" />
+          <Trash2 aria-hidden="true" />
         </button>
       </div>
 
-      {copied && (
-        <span className={styles.copyToast} role="status" aria-live="polite">
-          {t('copied')}
+      {confirmDelete && (
+        <div className={styles.confirm} role="dialog" aria-modal="true" aria-label={t('deleteTask')}>
+          <p>{running ? t('deleteRunningHint') : t('deleteConfirm')}</p>
+          <div className={styles.confirmActions}>
+            <button
+              type="button"
+              className={styles.confirmCancel}
+              onClick={() => setConfirmDelete(false)}
+              disabled={deleting}
+            >
+              {t('cancel')}
+            </button>
+            <button
+              type="button"
+              className={styles.confirmDelete}
+              onClick={() => void removeTask()}
+              disabled={deleting}
+              data-ui="task-delete-confirm"
+            >
+              {deleting ? t('loading') : t('delete')}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {deleteError && (
+        <span className={styles.actionError} role="alert" aria-live="polite">
+          {deleteError}
         </span>
       )}
 
