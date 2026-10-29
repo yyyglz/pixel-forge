@@ -19,7 +19,7 @@ const CATEGORIES: { value: string; key: MessageKey }[] = [
 const SKELETONS = Array.from({ length: 6 }, (_, index) => index);
 
 export default function TemplatesPage() {
-  const { t, locale, isSignedIn, openAccount } = useUser();
+  const { t, locale } = useUser();
   const [category, setCategory] = useState('全部');
 
   const templates = useQuery({
@@ -42,11 +42,6 @@ export default function TemplatesPage() {
         <Link href="/history" className={styles.chip}>
           {t('navHistory')}
         </Link>
-        {isSignedIn && (
-          <button type="button" className={styles.chip} data-ui="account" onClick={openAccount}>
-            {t('navAccount')}
-          </button>
-        )}
       </div>
 
       <nav className={styles.filters} aria-label={t('filters')}>

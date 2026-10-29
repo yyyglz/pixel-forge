@@ -5,7 +5,6 @@ export const messages = {
     // shell / navigation
     navTemplates: '模板',
     navHistory: '历史记录',
-    navAccount: '账户设置',
     language: 'English',
     account: '账户设置',
     signIn: '登录',
@@ -130,7 +129,6 @@ export const messages = {
   en: {
     navTemplates: 'Templates',
     navHistory: 'History',
-    navAccount: 'Account',
     language: '中文',
     account: 'Account settings',
     signIn: 'Log in',
