@@ -78,4 +78,98 @@ class TaskServiceTest {
         assertThrows(ApiException.class,()->service.task(2,"other-user-task"));
         verify(db,never()).update(anyString(),any(Object[].class));
     }
+    @Test void unavailableDatabaseAtFirstReadIsRetriedAsFailureAfterRecovery() {
+        when(db.queryForList(contains("SELECT * FROM creation_tasks"),any(Object[].class)))
+            .thenThrow(new org.springframework.dao.DataAccessResourceFailureException("offline"));
+        when(db.update(contains("SET status='FAILED'"),any(Object[].class)))
+            .thenThrow(new org.springframework.dao.DataAccessResourceFailureException("offline")).thenReturn(1);
+        assertDoesNotThrow(() -> service.process("db-task"));
+        service.retryPending();
+        verify(db,times(2)).update(contains("SET status='FAILED'"),any(),any(),eq("db-task"));
+    }
+    @Test void deletedTaskDuringFinalizingDoesNotLeaveCopiedFile() throws Exception {
+        Files.createDirectories(dir.resolve("uploads")); Files.writeString(dir.resolve("uploads/input.png"),"x");
+        when(db.queryForList(contains("SELECT * FROM creation_tasks"),any(Object[].class)))
+            .thenReturn(List.of(Map.of("fail_at","NONE","stage_delay_ms",0,"user_id",1)));
+        when(db.queryForList(contains("SELECT a.storage_path"),eq(String.class),any(Object[].class))).thenReturn(List.of("uploads/input.png"));
+        when(db.queryForObject(contains("SELECT a.storage_path"),eq(String.class),any(Object[].class))).thenReturn("uploads/input.png");
+        when(db.update(anyString(),any(Object[].class))).thenReturn(1);
+        when(db.update(contains("SET status='SUCCEEDED'"),any(Object[].class))).thenReturn(0);
+        service.process("race-task");
+        assertFalse(Files.exists(dir.resolve("results/race-task.png")));
+    }
+
+    @Test void ambiguousSuccessWriteKeepsFileIfDatabaseReferencesIt() throws Exception {
+        Files.createDirectories(dir.resolve("uploads")); Files.writeString(dir.resolve("uploads/input.png"),"x");
+        when(db.queryForList(contains("SELECT * FROM creation_tasks"),any(Object[].class)))
+            .thenReturn(List.of(Map.of("fail_at","NONE","stage_delay_ms",0,"user_id",1)));
+        when(db.queryForList(contains("SELECT a.storage_path"),eq(String.class),any(Object[].class))).thenReturn(List.of("uploads/input.png"));
+        when(db.queryForObject(contains("SELECT a.storage_path"),eq(String.class),any(Object[].class))).thenReturn("uploads/input.png");
+        when(db.update(anyString(),any(Object[].class))).thenReturn(1);
+        when(db.update(contains("SET status='SUCCEEDED'"),any(Object[].class)))
+            .thenThrow(new org.springframework.dao.DataAccessResourceFailureException("commit outcome unknown"));
+        when(db.queryForList(contains("SELECT result_url FROM creation_tasks"),any(Object[].class)))
+            .thenReturn(List.of(Map.of("result_url","/api/media/results/ambiguous-task.png?userId=1")));
+        service.process("ambiguous-task");
+        assertTrue(Files.exists(dir.resolve("results/ambiguous-task.png")));
+    }
+
+    @Test void failureAfterStageEntryRetriesRecordingWithoutContinuing() {
+        when(db.queryForList(contains("SELECT * FROM creation_tasks"),any(Object[].class)))
+            .thenReturn(List.of(Map.of("fail_at","NONE","stage_delay_ms",0,"user_id",1)));
+        when(db.update(contains("SET status='RUNNING'"),any(Object[].class)))
+            .thenThrow(new org.springframework.dao.DataAccessResourceFailureException("offline"));
+        when(db.update(contains("SET status='FAILED'"),any(Object[].class)))
+            .thenThrow(new org.springframework.dao.DataAccessResourceFailureException("offline")).thenReturn(1);
+        service.process("stage-task");
+        service.retryPending();
+        verify(db,times(2)).update(contains("SET status='FAILED'"),eq("ASSET_CHECK"),any(),eq("stage-task"));
+        verify(db,never()).update(contains("SET status='RUNNING'"),eq("GENERATING"),eq("stage-task"));
+    }
+    @Test void rejectedDispatchRefundsExactlyOnceAfterDatabaseRetry() {
+        when(db.queryForObject(contains("SELECT COUNT(*)"),eq(Integer.class),any(Object[].class))).thenReturn(1);
+        when(mapper.find(1)).thenReturn(Map.of("requiredImageCount",1,"acceptedMimeTypes","image/png","maxFileSizeBytes",100));
+        when(db.queryForList(contains("SELECT user_id,mime_type,file_size"),any(Object[].class)))
+            .thenReturn(List.of(Map.of("user_id",1,"mime_type","image/png","file_size",1)));
+        when(db.update(anyString(),any(Object[].class))).thenReturn(1);
+        when(db.update(contains("SET a.credits"),any(Object[].class)))
+            .thenThrow(new org.springframework.dao.DataAccessResourceFailureException("offline")).thenReturn(1);
+        doThrow(new java.util.concurrent.RejectedExecutionException()).when(executor).execute(any(Runnable.class));
+        org.springframework.transaction.support.TransactionSynchronizationManager.initSynchronization();
+        try {
+            String id=service.create(1,new CreateTask(1,List.of("asset"),"NONE",500));
+            var callback=org.springframework.transaction.support.TransactionSynchronizationManager.getSynchronizations().get(0);
+            callback.afterCommit();
+            service.retryPending();
+            service.retryPending();
+            verify(db,times(2)).update(contains("SET a.credits"),eq(id));
+            verify(db,times(2)).update(contains("SET status='FAILED'"),isNull(),any(),eq(id));
+        } finally { org.springframework.transaction.support.TransactionSynchronizationManager.clearSynchronization(); }
+    }
+    @Test void resultFileDeletionFailureIsRetried() throws Exception {
+        String id="22222222-2222-2222-2222-222222222222";
+        Path path=dir.resolve("results").resolve(id+".jpg");
+        Files.createDirectories(path); Files.writeString(path.resolve("locked"),"x");
+        when(db.queryForObject(contains("SELECT COUNT(*)"),eq(Integer.class),any(Object[].class))).thenReturn(1);
+        when(db.queryForList(contains("SELECT status,result_url FROM creation_tasks"),any(Object[].class)))
+            .thenReturn(List.of(Map.of("status","SUCCEEDED","result_url","/api/media/results/"+id+".jpg?userId=1")));
+        service.delete(1,id);
+        assertTrue(Files.exists(path));
+        Files.delete(path.resolve("locked"));
+        service.retryPending();
+        assertFalse(Files.exists(path));
+        verify(db).queryForList(contains("FOR UPDATE"),eq(id),eq(1L));
+    }
+    @Test void databaseFailureDuringDeleteDoesNotRemoveReferencedResult() throws Exception {
+        String id="33333333-3333-3333-3333-333333333333";
+        Path path=dir.resolve("results").resolve(id+".jpg"); Files.createDirectories(path.getParent()); Files.writeString(path,"x");
+        String url="/api/media/results/"+id+".jpg?userId=1";
+        when(db.queryForObject(contains("SELECT COUNT(*)"),eq(Integer.class),any(Object[].class))).thenReturn(1);
+        when(db.queryForList(contains("SELECT status,result_url"),any(Object[].class))).thenReturn(List.of(Map.of("result_url",url)));
+        when(db.update(contains("DELETE FROM task_events"),any(Object[].class))).thenThrow(new org.springframework.dao.DataAccessResourceFailureException("offline"));
+        when(db.queryForList(contains("SELECT result_url FROM creation_tasks"),any(Object[].class))).thenReturn(List.of(Map.of("result_url",url)));
+        assertThrows(org.springframework.dao.DataAccessResourceFailureException.class,()->service.delete(1,id));
+        assertTrue(Files.exists(path));
+    }
+
 }

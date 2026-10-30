@@ -484,3 +484,7 @@
     animation: none;
   }
 }
+
+/* List refetch errors must not hide the last successful task data. */
+.listSyncError { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 9px 12px; margin-bottom: 10px; border-radius: 6px; background: #2a2413; color: #f0d98a; font-size: 12px; }
+.listSyncError button { text-decoration: underline; text-underline-offset: 2px; }

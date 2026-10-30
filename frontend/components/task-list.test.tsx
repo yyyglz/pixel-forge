@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { TaskCard, TaskList } from './task-list';
@@ -270,4 +270,25 @@ describe('TaskList', () => {
     expect(screen.getByRole('button', { name: '上一页' })).toBeDisabled();
     expect(screen.getByText('第 1')).toBeInTheDocument();
   });
+  it('已有任务时列表刷新失败保留任务并显示重试入口', async () => {
+    let listCalls = 0;
+    const running = task('kept', 'RUNNING', { currentStage: 'GENERATING' });
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).includes('/tasks?')) {
+        if (++listCalls === 1) return jsonResponse([running]);
+        throw new Error('列表同步失败');
+      }
+      return jsonResponse(running);
+    }));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={client}><TaskList variant="full" /></QueryClientProvider>);
+    expect(await screen.findByText('模板 kept')).toBeInTheDocument();
+    await act(async () => { await client.invalidateQueries({ queryKey: ['tasks', 1] }); });
+    expect(screen.getByText('模板 kept')).toBeInTheDocument();
+    expect(screen.getAllByText('处理中').length).toBeGreaterThan(0);
+    expect(await screen.findByText(/状态同步失败/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '重新查询' })).toBeInTheDocument();
+    expect(screen.queryByText('制作失败')).not.toBeInTheDocument();
+  });
+
 });

@@ -86,6 +86,7 @@ export function TaskCard({
     try {
       await api<{ deleted: boolean }>(`/tasks/${task.id}`, { method: 'DELETE' }, user);
       client.removeQueries({ queryKey: ['task', user, task.id] });
+      client.setQueriesData<Task[]>({ queryKey: ['tasks', user] }, (items) => items?.filter((item) => item.id !== task.id));
       await client.invalidateQueries({ queryKey: ['tasks', user] });
       setConfirmDelete(false);
     } catch (error) {
@@ -279,7 +280,7 @@ export function TaskList({
     );
   }
 
-  if (query.isError) {
+  if (query.isError && !query.data) {
     return (
       <div className={rootClass}>
         <div className={styles.state} role="alert">
@@ -298,6 +299,7 @@ export function TaskList({
 
   return (
     <div className={rootClass}>
+      {query.isError && <div className={styles.listSyncError} role="alert"><span>{t('syncError')}</span><button type="button" onClick={() => void query.refetch()}>{t('queryAgain')}</button></div>}
       {tasks.length ? (
         panel ? (
           <div className={styles.panelScroll}>

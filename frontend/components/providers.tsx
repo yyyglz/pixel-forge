@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { QueryClient, QueryClientProvider, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import {
   ChevronRight,
   CreditCard,
@@ -67,10 +67,10 @@ function Shell({ children }: { children: React.ReactNode }) {
   const client = useQueryClient();
   const [user, setUser] = useState(1);
   const [isSignedIn, setSignedIn] = useState(false);
-  const [users, setUsers] = useState<User[]>([]);
   const [locale, setLocaleState] = useState<Locale>('zh');
   const [modal, setModal] = useState<ModalName>(null);
   const [showResetNote, setShowResetNote] = useState(false);
+  const sessionVersion = useRef(0);
 
 
   useEffect(() => {
@@ -95,15 +95,16 @@ function Shell({ children }: { children: React.ReactNode }) {
         document.documentElement.lang = savedLocale === 'zh' ? 'zh-CN' : 'en';
       }
     });
-    api<User[]>('/demo/users')
-      .then((value) => {
-        if (mounted) setUsers(value);
-      })
-      .catch(() => {});
     return () => {
       mounted = false;
     };
   }, []);
+
+  const usersQuery = useQuery({
+    queryKey: ['demo-users'],
+    queryFn: ({ signal }) => api<User[]>('/demo/users', { signal }),
+  });
+  const users = usersQuery.data ?? [];
 
   useEffect(() => {
     if (!modal) return;
@@ -120,6 +121,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   }
 
   function changeUser(id: number) {
+    sessionVersion.current += 1;
     void client.cancelQueries();
     client.clear();
     localStorage.setItem('pixel-user', String(id));
@@ -130,6 +132,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   }
 
   function logOut() {
+    sessionVersion.current += 1;
     void client.cancelQueries();
     client.clear();
     localStorage.removeItem('pixel-user');
@@ -141,7 +144,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   function setLocale(value: Locale) {
     localStorage.setItem('pixel-locale', value);
     setLocaleState(value);
-    document.documentElement.lang = value === 'zh' ? 'zh-CN' : 'en';
+    document.documentElement.setAttribute('lang', value === 'zh' ? 'zh-CN' : 'en');
   }
 
   const t = (key: MessageKey): string => messages[locale][key];
@@ -153,7 +156,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   });
 
   const updateAccount = useMutation({
-    mutationFn: ({ action, plan }: { action: 'plan' | 'credits'; plan?: 'FREE' | 'PRO' }) =>
+    mutationFn: ({ action, plan, ownerId }: { action: 'plan' | 'credits'; plan?: 'FREE' | 'PRO'; ownerId: number; session: number }) =>
       api<Account>(
         `/demo/account/${action}`,
         {
@@ -162,9 +165,11 @@ function Shell({ children }: { children: React.ReactNode }) {
             ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ plan }) }
             : {}),
         },
-        user,
+        ownerId,
       ),
-    onSuccess: (data) => client.setQueryData(['demo-account', user], data),
+    onSuccess: (data, variables) => {
+      if (variables.session === sessionVersion.current) client.setQueryData(['demo-account', variables.ownerId], data);
+    },
   });
 
   const selected = users.find((u) => u.id === user);
@@ -285,8 +290,13 @@ function Shell({ children }: { children: React.ReactNode }) {
                         <span className="go">{t('loginAction')}</span>
                       </button>
                     ))
+                  ) : usersQuery.isPending ? (
+                    <p className="modal-note" role="status">{t('loading')}</p>
                   ) : (
-                    <p className="modal-note">{t('loadFailed')}</p>
+                    <div role="alert">
+                      <p className="modal-note">{t('loadFailed')}</p>
+                      <button type="button" className="account-link" onClick={() => void usersQuery.refetch()}>{t('retry')}</button>
+                    </div>
                   )}
                 </div>
               </>
@@ -401,7 +411,7 @@ function Shell({ children }: { children: React.ReactNode }) {
                           <button
                             type="button"
                             disabled={!account.data || account.data.plan === plan || updateAccount.isPending}
-                            onClick={() => updateAccount.mutate({ action: 'plan', plan })}
+                            onClick={() => updateAccount.mutate({ action: 'plan', plan, ownerId: user, session: sessionVersion.current })}
                           >
                             {account.data?.plan === plan ? t('current') : t('choosePlan')}
                           </button>
@@ -412,7 +422,7 @@ function Shell({ children }: { children: React.ReactNode }) {
                       type="button"
                       className="credits-add"
                       disabled={!account.data || updateAccount.isPending}
-                      onClick={() => updateAccount.mutate({ action: 'credits' })}
+                      onClick={() => updateAccount.mutate({ action: 'credits', ownerId: user, session: sessionVersion.current })}
                     >
                       {t('addCredits')}
                     </button>

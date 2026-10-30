@@ -15,7 +15,7 @@ import {
   Sparkles,
   X,
 } from 'lucide-react';
-import { api, Asset, Template } from '@/lib/api';
+import { api, Asset, Task, Template } from '@/lib/api';
 import { localizeError, templateCopy, templateCover } from '@/lib/i18n';
 import { useUser } from '@/components/providers';
 import { TaskList } from '@/components/task-list';
@@ -45,12 +45,15 @@ export default function TemplateDetail({ params }: { params: Promise<{ id: strin
   const [notice, setNotice] = useState<Notice | null>(null);
   const [imagePreview, setImagePreview] = useState<{ src: string; alt: string } | null>(null);
   const requests = useRef<Map<number, AbortController>>(new Map());
+  const mounted = useRef(true);
 
   // Abort any in-flight upload when the page unmounts; replacements abort the
   // previous request for the same slot inside `upload`.
   useEffect(() => {
     const current = requests.current;
+    mounted.current = true;
     return () => {
+      mounted.current = false;
       current.forEach((controller) => controller.abort());
       current.clear();
     };
@@ -78,8 +81,22 @@ export default function TemplateDetail({ params }: { params: Promise<{ id: strin
         user,
       ),
     onMutate: () => setNotice(null),
-    onSuccess: () => {
+    onSuccess: async ({ taskId }) => {
+      if (!mounted.current) return;
       setNotice({ kind: 'success', text: t('accepted') });
+      // The server has accepted the task even if the history refresh fails.
+      // Seed only this template's first page, then let the task query fetch its
+      // authoritative status. Cancel an older list request before seeding it.
+      const key = ['tasks', user, 0, id] as const;
+      await client.cancelQueries({ queryKey: key, exact: true });
+      if (!mounted.current) return;
+      const createdAt = new Date().toISOString();
+      const accepted: Task = {
+        id: taskId, templateId: id, templateTitle: templateQuery.data?.title ?? '',
+        status: 'QUEUED', currentStage: null, failedStage: null, errorMessage: null,
+        resultUrl: null, createdAt, updatedAt: createdAt,
+      };
+      client.setQueryData<Task[]>(key, (previous) => [accepted, ...(previous ?? []).filter((task) => task.id !== taskId)]);
       void client.invalidateQueries({ queryKey: ['tasks', user] });
       void client.invalidateQueries({ queryKey: ['demo-account', user] });
     },
@@ -220,6 +237,8 @@ export default function TemplateDetail({ params }: { params: Promise<{ id: strin
         <div className={styles.cover}>
           <img className={styles.coverImg} src={templateCover(template.coverUrl)} alt={template.title} />
         </div>
+
+        <p className={styles.description}>{template.description}</p>
 
         <div className={styles.uploadHead}>
           <h2 className={styles.uploadTitle}>{t('upload')}</h2>

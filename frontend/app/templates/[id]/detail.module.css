@@ -563,3 +563,5 @@
     padding: 16px;
   }
 }
+
+.description { margin: 12px 0 0; color: var(--muted); font-size: 12px; line-height: 1.55; overflow-wrap: anywhere; }
